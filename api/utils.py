@@ -1,16 +1,36 @@
 # backend/api/utils.py
-import pywhatkit
+import requests
+from django.conf import settings
 
 def send_whatsapp_message(number, message):
     """
-    Opens WhatsApp Web and types the message automatically.
-    CR can manually press send.
+    Send a simple text message using WhatsApp Cloud API.
+    `number` must be in international format without + (e.g. 919699136772 or 919699136772).
     """
-    # number: must include country code, e.g., "91xxxxxxxxxx"
-    pywhatkit.sendwhatmsg_instantly(
-        phone_no=f"+{number}",  # Add + if needed
-        message=message,
-        wait_time=10,           # Time to load WhatsApp Web
-        tab_close=False,        # Do not close tab automatically
-        close_time=3            # Optional, seconds to wait after typing
-    )
+    url = f"https://graph.facebook.com/{settings.WHATSAPP_API_VERSION}/{settings.WHATSAPP_PHONE_ID}/messages"
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": number,
+        "type": "text",
+        "text": {"body": message}
+    }
+
+    headers = {
+        "Authorization": f"Bearer {settings.WHATSAPP_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    resp = requests.post(url, json=payload, headers=headers)
+    try:
+        data = resp.json()
+    except Exception:
+        data = resp.text
+
+    if resp.status_code not in (200, 201):
+        # log for debugging
+        print("WhatsApp API error", resp.status_code, data)
+    else:
+        print("WhatsApp API success:", data)
+
+    return resp.status_code, data

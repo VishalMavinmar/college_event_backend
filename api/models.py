@@ -26,15 +26,23 @@ class Student(models.Model):
     token_number = models.AutoField(primary_key=True)  # Auto token generation ✅
 
     def save(self, *args, **kwargs):
-        new_image = False
-        if self.pk is None and self.image:
-            new_image = True
-            old_image = self.image
-            self.image = None  # temporarily remove image
+        is_new = self.pk is None
+        old_image = self.image
 
-        super().save(*args, **kwargs)  # Save first to generate token_number
+        # Temporarily remove image to generate token first
+        if is_new and self.image:
+            self.image = None
 
-        if new_image:
+        super().save(*args, **kwargs)
+
+        # Now we definitely have a token_number
+        if is_new:
+            # Refresh instance to get latest token
+            self.refresh_from_db()
+
+        # Handle image upload after token is known
+        if is_new and old_image:
+            import os
             ext = os.path.splitext(old_image.name)[1]
             new_path = f'students/{self.token_number}/{os.path.basename(old_image.name)}'
             full_path = os.path.join('media', new_path)
@@ -45,6 +53,3 @@ class Student(models.Model):
 
             self.image = new_path
             super().save(update_fields=['image'])
-
-    def __str__(self):
-        return f"{self.name} - Token: {self.token_number}"
